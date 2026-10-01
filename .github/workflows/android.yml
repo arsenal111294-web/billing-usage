@@ -83,6 +83,9 @@ jobs:
           dest="billing-tracker-${ANDROID_VERSION_NAME}.apk"
           cp "$src" "$dest"
           echo "path=$dest" >> "$GITHUB_OUTPUT"
+          # Отпечаток сертификата: у всех релизных сборок он должен совпадать.
+          apksigner=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -n 1)/apksigner
+          "$apksigner" verify --print-certs "$dest" | grep -i "SHA-256"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -98,5 +101,5 @@ jobs:
           make_latest: true
           files: ${{ steps.apk.outputs.path }}
           body: |
-            APK для Android (${{ steps.signing.outputs.variant }}).
+            APK для Android (${{ steps.signing.outputs.variant == 'release' && 'подписан постоянным ключом — обновления ставятся поверх' || 'debug-сборка' }}).
             Скачайте файл ниже, откройте его на телефоне и разрешите установку из этого источника.
