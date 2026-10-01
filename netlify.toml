@@ -1,0 +1,17 @@
+# Netlify автоматически определяет Next.js и подключает OpenNext-адаптер
+# (@netlify/plugin-nextjs). Достаточно привязать репозиторий к сайту.
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "22"
+  NEXT_TELEMETRY_DISABLED = "1"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+# Ежедневная проверка (синхронизация лимитов + напоминания о списаниях)
+# реализована как Scheduled Function: netlify/functions/daily-check.mts
+[functions]
+  directory = "netlify/functions"
