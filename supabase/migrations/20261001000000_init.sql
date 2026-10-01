@@ -2,8 +2,6 @@
 -- Приложение обращается к БД только с сервера через service_role ключ.
 -- RLS включён без политик, поэтому anon/authenticated ключи доступа к данным не имеют.
 
-create extension if not exists pgcrypto;
-
 -- ─── Интеграции (API-ключи / сессии для динамического отслеживания остатков) ───
 create table if not exists public.integrations (
   id                    uuid primary key default gen_random_uuid(),
