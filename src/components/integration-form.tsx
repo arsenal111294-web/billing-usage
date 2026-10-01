@@ -82,7 +82,8 @@ export function IntegrationForm({ providers, integration }: Props) {
                     name={id}
                     type={field.type === "password" ? "password" : "text"}
                     inputMode={field.type === "number" ? "decimal" : undefined}
-                    autoComplete={field.secret ? "off" : undefined}
+                    // "new-password" — иначе Chrome подставляет сюда сохранённый пароль от входа
+                    autoComplete={field.secret ? "new-password" : "off"}
                     placeholder={savedSecret ? "••••••••" : field.placeholder}
                     defaultValue={field.secret ? undefined : integration?.config[field.key]}
                     aria-invalid={Boolean(error)}
