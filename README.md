@@ -93,6 +93,32 @@ curl -X POST -H "Authorization: Bearer $CRON_SECRET" https://your-app/api/cron/d
 
 **Telegram:** создайте бота у [@BotFather](https://t.me/BotFather), напишите ему любое сообщение и возьмите `chat.id` из `https://api.telegram.org/bot<TOKEN>/getUpdates`.
 
+## Android-приложение
+
+`android/` — нативная оболочка на [Capacitor](https://capacitorjs.com): приложение открывает опубликованный сайт (`server.url` в `capacitor.config.ts`), поэтому новые функции появляются в нём сразу после деплоя сайта, без переустановки APK.
+
+- **Уведомления от самого приложения.** `src/components/native-bridge.tsx` при каждом открытии берёт расписание из `/api/native/reminders` и планирует локальные уведомления на 90 дней вперёд (в 10:00 по времени телефона): скорые списания, конец пробных периодов, критичные лимиты и баланс. Уведомления срабатывают без интернета и переживают перезагрузку; Firebase не нужен.
+- **Нажатие на уведомление** открывает нужную подписку или интеграцию; системная «Назад» работает как в браузере.
+- Без сети показывается `native-shell/offline.html` с кнопкой повтора.
+
+### Сборка APK
+
+Workflow `.github/workflows/android.yml` собирает APK в GitHub Actions и публикует его в [Releases](../../releases/latest). Запуск: вручную (Actions → Android APK → Run workflow), тегом `android-v*` или автоматически при изменении `android/`, `native-shell/`, `capacitor.config.ts`.
+
+Чтобы новые версии ставились поверх старых, APK подписывается постоянным ключом. Добавьте секреты репозитория (Settings → Secrets and variables → Actions):
+
+| Секрет | Значение |
+|---|---|
+| `ANDROID_KEYSTORE_BASE64` | keystore в base64 (`base64 -w0 release.keystore`) |
+| `ANDROID_KEYSTORE_PASSWORD` | пароль keystore |
+| `ANDROID_KEY_ALIAS` | алиас ключа (по умолчанию `billing-tracker`) |
+
+Без секретов собирается debug-APK. Он устанавливается, но обновить его релизной сборкой нельзя: сначала удалите его.
+
+Создать ключ: `keytool -genkeypair -v -keystore release.keystore -alias billing-tracker -keyalg RSA -keysize 2048 -validity 10000`. Храните keystore вне репозитория: без него обновить приложение не получится.
+
+Локальная сборка (нужен Android SDK): `npx cap sync android && cd android && ./gradlew assembleDebug`.
+
 ## Структура
 
 ```
@@ -101,6 +127,7 @@ src/
     (app)/            дашборд, подписки, интеграции, уведомления + server actions
     login/            вход по паролю
     api/cron/daily    ежедневная проверка (Bearer CRON_SECRET)
+    api/native        расписание уведомлений для Android-приложения
     api/health        healthcheck
   components/         UI: карточки, формы, график, индикаторы лимитов
   lib/
@@ -112,6 +139,7 @@ src/
     jobs.ts           ежедневная задача
 supabase/migrations   схема БД
 netlify/functions     scheduled function
+android/              Android-оболочка (Capacitor), native-shell/ — офлайн-страница, assets/ — исходники иконок
 ```
 
 ### Как добавить новый сервис

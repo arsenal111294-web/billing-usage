@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { CheckCircle2, CircleDashed } from "lucide-react";
 import { AlertRow } from "@/components/alert-row";
+import { AndroidAppCard } from "@/components/android-app-card";
 import { RunCheckButton, TestNotificationButton } from "@/components/notification-controls";
 import { Badge, Card, CardHeader } from "@/components/ui";
 import { LIMIT_CRITICAL, LIMIT_WARNING } from "@/lib/alerts";
@@ -81,6 +82,8 @@ export default async function AlertsPage() {
             <RunCheckButton />
           </div>
         </Card>
+
+        <AndroidAppCard />
       </div>
     </div>
   );

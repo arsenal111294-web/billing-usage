@@ -1,0 +1,102 @@
+name: Android APK
+
+# Сборка APK: вручную (Actions → Android APK → Run workflow), пушем тега android-v*
+# или автоматически при изменении нативной оболочки. Каждая сборка публикуется в Releases.
+on:
+  workflow_dispatch:
+  push:
+    tags: ["android-v*"]
+    branches: ["claude/gifted-volta-aio37v"]
+    paths:
+      - "android/**"
+      - "native-shell/**"
+      - "capacitor.config.ts"
+      - ".github/workflows/android.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      ANDROID_VERSION_CODE: ${{ github.run_number }}
+      ANDROID_VERSION_NAME: 1.0.${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Sync Capacitor
+        run: npx cap sync android
+
+      # Подпись релизным ключом, если заданы секреты; иначе собирается debug-APK
+      # (тоже устанавливается, но обновлять его поверх релизного нельзя).
+      - name: Prepare signing key
+        id: signing
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+            echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/release.keystore" >> "$GITHUB_ENV"
+            echo "variant=release" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::Секрет ANDROID_KEYSTORE_BASE64 не задан — собираю debug-APK"
+            echo "variant=debug" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build APK
+        working-directory: android
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ "${{ steps.signing.outputs.variant }}" = "release" ]; then
+            ./gradlew --no-daemon assembleRelease
+          else
+            ./gradlew --no-daemon assembleDebug
+          fi
+
+      - name: Collect APK
+        id: apk
+        run: |
+          src=$(find android/app/build/outputs/apk/${{ steps.signing.outputs.variant }} -name '*.apk' | head -n 1)
+          dest="billing-tracker-${ANDROID_VERSION_NAME}.apk"
+          cp "$src" "$dest"
+          echo "path=$dest" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: billing-tracker-apk
+          path: ${{ steps.apk.outputs.path }}
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('android-build-{0}', github.run_number) }}
+          name: Billing Tracker ${{ env.ANDROID_VERSION_NAME }}
+          target_commitish: ${{ github.sha }}
+          make_latest: true
+          files: ${{ steps.apk.outputs.path }}
+          body: |
+            APK для Android (${{ steps.signing.outputs.variant }}).
+            Скачайте файл ниже, откройте его на телефоне и разрешите установку из этого источника.

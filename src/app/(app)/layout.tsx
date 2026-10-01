@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Info, LogOut, ShieldAlert, WalletCards } from "lucide-react";
 import { logout } from "@/app/login/actions";
+import { NativeBridge } from "@/components/native-bridge";
 import { Nav } from "@/components/nav";
 import { isAuthEnabled, requireAuth } from "@/lib/auth";
 import { loadAppData } from "@/lib/data";
@@ -63,6 +64,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       ) : null}
 
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">{children}</main>
+      <NativeBridge />
     </div>
   );
 }

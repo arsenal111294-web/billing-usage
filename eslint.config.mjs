@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Нативная оболочка Android (Capacitor) — генерируется и не относится к веб-приложению.
+    "android/**",
+    "native-shell/**",
   ]),
 ]);
 

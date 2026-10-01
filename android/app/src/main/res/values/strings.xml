@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Billing Tracker</string>
+    <string name="title_activity_main">Billing Tracker</string>
+    <string name="package_name">ru.billingtracker.app</string>
+    <string name="custom_url_scheme">ru.billingtracker.app</string>
+</resources>
