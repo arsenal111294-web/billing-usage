@@ -3,6 +3,10 @@
 [build]
   command = "npm run build"
   publish = ".next"
+  # Экономия кредитов (15 за production-деплой): сайт собирается, только если
+  # в описании последнего коммита есть метка [deploy]. Иначе Netlify пропускает
+  # сборку бесплатно. Код ответа: 0 — пропустить, 1 — собирать.
+  ignore = "git log -1 --pretty=%B | grep -qF '[deploy]' && exit 1 || exit 0"
 
 [build.environment]
   NODE_VERSION = "22"
