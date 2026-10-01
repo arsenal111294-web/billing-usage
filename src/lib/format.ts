@@ -1,4 +1,5 @@
 import { formatMoney } from "./currency";
+import { pluralDays } from "./dates";
 import type { MetricUnit, UsageMetric } from "./types";
 
 const compact = new Intl.NumberFormat("ru-RU", { notation: "compact", maximumFractionDigits: 1 });
@@ -19,6 +20,12 @@ export function formatMetricValue(value: number, unit: MetricUnit): string {
   switch (unit) {
     case "usd":
       return formatMoney(value, "USD");
+    case "rub":
+      return formatMoney(value, "RUB");
+    case "cny":
+      return formatMoney(value, "CNY");
+    case "days":
+      return pluralDays(Math.floor(value));
     case "bytes":
       return formatBytes(value);
     case "minutes":

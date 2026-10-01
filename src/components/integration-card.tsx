@@ -1,17 +1,11 @@
 import { AlertCircle, CheckCircle2, Clock } from "lucide-react";
 import { formatDateTime } from "@/lib/dates";
+import { getProvider } from "@/lib/integrations";
 import type { Integration } from "@/lib/types";
 import { SyncButton } from "./sync-button";
 import { Badge, Card } from "./ui";
 import { UsageMeter } from "./usage-meter";
 
-const PROVIDER_NAMES: Record<Integration["provider"], string> = {
-  netlify: "Netlify",
-  supabase: "Supabase",
-  anthropic: "Anthropic",
-  openai: "OpenAI",
-  manual: "Вручную",
-};
 
 export function StatusBadge({ integration }: { integration: Integration }) {
   if (integration.status === "error")
@@ -39,7 +33,7 @@ export function IntegrationCard({ integration, footer }: { integration: Integrat
     <Card className="flex min-w-0 flex-col gap-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted">{PROVIDER_NAMES[integration.provider]}</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-muted">{integration.provider === "manual" ? "Вручную" : (getProvider(integration.provider)?.name ?? integration.provider)}</p>
           <h3 className="truncate font-semibold text-ink">{integration.name}</h3>
           {usage?.plan ? <p className="text-sm text-ink-2">Тариф: {usage.plan}</p> : null}
         </div>

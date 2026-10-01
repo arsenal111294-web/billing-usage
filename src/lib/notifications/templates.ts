@@ -23,8 +23,9 @@ export function escapeHtml(value: string): string {
 }
 
 function chargeLine(c: UpcomingCharge) {
+  const trial = c.subscription.trialEndsAt === c.date;
   return {
-    name: c.subscription.name,
+    name: trial ? `${c.subscription.name} (конец пробного периода)` : c.subscription.name,
     amount: formatMoney(c.subscription.cost, c.subscription.currency),
     when: `${relativeDays(c.daysLeft)} (${formatDate(c.date)})`,
   };

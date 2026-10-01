@@ -29,12 +29,14 @@ function seedState(): MemoryState {
   const today = todayISO();
   const ts = now();
   const sub = (
-    input: Omit<SubscriptionInput, "notes" | "integrationId" | "url"> & Partial<SubscriptionInput>,
+    input: Omit<SubscriptionInput, "notes" | "integrationId" | "url" | "serviceKey" | "trialEndsAt"> & Partial<SubscriptionInput>,
   ): Subscription => ({
     id: randomUUID(),
     notes: null,
     url: null,
     integrationId: null,
+    serviceKey: null,
+    trialEndsAt: null,
     createdAt: ts,
     updatedAt: ts,
     ...input,
@@ -54,7 +56,7 @@ function seedState(): MemoryState {
       metrics: [
         { key: "db_size", label: "Размер БД", used: 412 * 1024 ** 2, limit: 500 * 1024 ** 2, unit: "bytes" },
         { key: "storage_size", label: "Хранилище файлов", used: 0.31 * 1024 ** 3, limit: 1024 ** 3, unit: "bytes" },
-        { key: "active_projects", label: "Активные проекты", used: 2, limit: 2, unit: "count" },
+        { key: "active_projects", label: "Активные проекты", used: 2, limit: 2, unit: "count", alerting: false },
       ],
     }),
     demoIntegration("anthropic", "Anthropic API", {
@@ -68,13 +70,16 @@ function seedState(): MemoryState {
   ];
 
   const subscriptions: Subscription[] = [
-    sub({ name: "Claude Max", category: "AI", cost: 100, currency: "USD", billingCycle: "monthly", nextBillingDate: addDays(today, 2), status: "active", remindDaysBefore: 3, url: "https://claude.ai/settings/billing" }),
-    sub({ name: "Netlify Pro", category: "Хостинг", cost: 19, currency: "USD", billingCycle: "monthly", nextBillingDate: addDays(today, 11), status: "active", remindDaysBefore: 3, url: "https://app.netlify.com", integrationId: integrations[0].id }),
-    sub({ name: "Supabase Pro", category: "Хостинг", cost: 25, currency: "USD", billingCycle: "monthly", nextBillingDate: addDays(today, 19), status: "active", remindDaysBefore: 3, url: "https://supabase.com/dashboard", integrationId: integrations[1].id }),
-    sub({ name: "GitHub Copilot", category: "Разработка", cost: 100, currency: "USD", billingCycle: "yearly", nextBillingDate: addDays(today, 140), status: "active", remindDaysBefore: 3, url: "https://github.com/settings/billing" }),
-    sub({ name: "JetBrains All Products", category: "Разработка", cost: 289, currency: "EUR", billingCycle: "yearly", nextBillingDate: addDays(today, 64), status: "active", remindDaysBefore: 7 }),
+    sub({ name: "Claude Max", serviceKey: "claude", category: "AI", cost: 100, currency: "USD", billingCycle: "monthly", nextBillingDate: addDays(today, 2), status: "active", remindDaysBefore: 3, url: "https://claude.ai/settings/billing" }),
+    sub({ name: "Netlify Pro", serviceKey: "netlify", category: "Хостинг", cost: 19, currency: "USD", billingCycle: "monthly", nextBillingDate: addDays(today, 11), status: "active", remindDaysBefore: 3, url: "https://app.netlify.com", integrationId: integrations[0].id }),
+    sub({ name: "Supabase Pro", serviceKey: "supabase", category: "Хостинг", cost: 25, currency: "USD", billingCycle: "monthly", nextBillingDate: addDays(today, 19), status: "active", remindDaysBefore: 3, url: "https://supabase.com/dashboard", integrationId: integrations[1].id }),
+    sub({ name: "GitHub Copilot", serviceKey: "github-copilot", category: "Разработка", cost: 100, currency: "USD", billingCycle: "yearly", nextBillingDate: addDays(today, 140), status: "active", remindDaysBefore: 3, url: "https://github.com/settings/billing" }),
+    sub({ name: "JetBrains All Products", serviceKey: "jetbrains", category: "Разработка", cost: 289, currency: "EUR", billingCycle: "yearly", nextBillingDate: addDays(today, 64), status: "active", remindDaysBefore: 7 }),
     sub({ name: "Домен example.ru", category: "Домены", cost: 990, currency: "RUB", billingCycle: "yearly", nextBillingDate: addDays(today, 1), status: "active", remindDaysBefore: 3 }),
-    sub({ name: "Figma Professional", category: "Дизайн", cost: 15, currency: "USD", billingCycle: "monthly", nextBillingDate: addDays(today, 6), status: "paused", remindDaysBefore: 3, url: "https://figma.com" }),
+    sub({ name: "Figma Professional", serviceKey: "figma", category: "Дизайн", cost: 15, currency: "USD", billingCycle: "monthly", nextBillingDate: addDays(today, 6), status: "paused", remindDaysBefore: 3, url: "https://figma.com" }),
+    sub({ name: "Яндекс Плюс", serviceKey: "yandex-plus", category: "Экосистемы", cost: 449, currency: "RUB", billingCycle: "monthly", nextBillingDate: addDays(today, 9), status: "active", remindDaysBefore: 3, url: "https://plus.yandex.ru/my" }),
+    sub({ name: "Кинопоиск", serviceKey: "kinopoisk", category: "Кино и ТВ", cost: 449, currency: "RUB", billingCycle: "monthly", nextBillingDate: addDays(today, 15), status: "active", remindDaysBefore: 3, url: "https://hd.kinopoisk.ru/" }),
+    sub({ name: "Okko", serviceKey: "okko", category: "Кино и ТВ", cost: 399, currency: "RUB", billingCycle: "monthly", nextBillingDate: addDays(today, 2), trialEndsAt: addDays(today, 2), status: "active", remindDaysBefore: 3, url: "https://okko.tv/" }),
   ];
 
   return { subscriptions, integrations, notifications: new Set() };

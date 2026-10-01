@@ -1,10 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ExternalLink, Pause, Pencil, Play, Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, ExternalLink, Pause, Pencil, Play, Plus, Trash2 } from "lucide-react";
+import { CatalogPicker } from "@/components/catalog-picker";
 import { ConfirmButton } from "@/components/confirm-button";
+import { ServiceAvatar } from "@/components/service-avatar";
 import { SubscriptionForm } from "@/components/subscription-form";
 import { Badge, buttonClass, Card, CardHeader, EmptyState } from "@/components/ui";
 import { CYCLE_LABELS, computeTotals, effectiveNextBillingDate, monthlyEquivalent } from "@/lib/billing";
+import { bundleOverlaps } from "@/lib/bundles";
+import { bundlesContaining, getCatalogService } from "@/lib/catalog";
 import { convert, formatMoney, SUPPORTED_CURRENCIES } from "@/lib/currency";
 import { addDays, diffInDays, formatDate, relativeDays } from "@/lib/dates";
 import { loadAppData } from "@/lib/data";
@@ -12,11 +16,20 @@ import { deleteSubscriptionAction, toggleSubscriptionStatusAction } from "./acti
 
 export const metadata: Metadata = { title: "Подписки" };
 
-export default async function SubscriptionsPage({ searchParams }: { searchParams: Promise<{ new?: string; edit?: string }> }) {
+export default async function SubscriptionsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ new?: string; edit?: string; service?: string }>;
+}) {
   const params = await searchParams;
   const { today, subscriptions, integrations, currency, rates } = await loadAppData();
   const editing = params.edit ? (subscriptions.find((s) => s.id === params.edit) ?? null) : null;
-  const showForm = Boolean(params.new) || Boolean(editing);
+  const picking = Boolean(params.new) && !params.service && !editing;
+  const showForm = (Boolean(params.new) && Boolean(params.service)) || Boolean(editing);
+  const service = editing ? getCatalogService(editing.serviceKey) : getCatalogService(params.service);
+  const activeKeys = new Set(subscriptions.filter((s) => s.status === "active" && s.serviceKey).map((s) => s.serviceKey!));
+  const coveredBy = service ? bundlesContaining(service.key).filter((b) => activeKeys.has(b.key)).map((b) => b.name) : [];
+  const overlaps = bundleOverlaps(subscriptions);
   const totals = computeTotals(subscriptions, currency, rates);
   const categories = [...new Set(subscriptions.map((s) => s.category).filter(Boolean) as string[])].sort();
   const currencies = [...new Set([currency, ...SUPPORTED_CURRENCIES])];
@@ -35,22 +48,39 @@ export default async function SubscriptionsPage({ searchParams }: { searchParams
             {totals.activeCount} активных · {formatMoney(totals.monthly, currency)} в месяц · {formatMoney(totals.yearly, currency)} в год
           </p>
         </div>
-        {!showForm ? (
+        {!showForm && !picking ? (
           <Link href="/subscriptions?new=1" className={buttonClass("primary")}>
-            <Plus className="size-4" aria-hidden /> Добавить вручную
+            <Plus className="size-4" aria-hidden /> Добавить подписку
           </Link>
         ) : null}
       </div>
 
+      {picking ? (
+        <Card>
+          <CardHeader
+            title="Выберите сервис"
+            description="50 популярных сервисов: тариф и цена подставятся сами. Цены ориентировочные (сентябрь 2026)."
+            action={
+              <Link href="/subscriptions" className={buttonClass("ghost", "sm")}>
+                Закрыть
+              </Link>
+            }
+          />
+          <CatalogPicker addedKeys={[...new Set(subscriptions.map((s) => s.serviceKey).filter(Boolean) as string[])]} />
+        </Card>
+      ) : null}
+
       {showForm ? (
         <Card>
           <CardHeader
-            title={editing ? `Редактирование: ${editing.name}` : "Новая подписка"}
-            description="Для сервисов без API — стоимость, периодичность и дата следующего списания."
+            title={editing ? `Редактирование: ${editing.name}` : service ? `Новая подписка: ${service.name}` : "Свой сервис"}
+            description={editing || service ? undefined : "Укажите стоимость, периодичность и дату следующего списания."}
           />
           <SubscriptionForm
-            key={editing?.id ?? "new"}
+            key={editing?.id ?? `new-${service?.key ?? "custom"}`}
             subscription={editing}
+            service={service}
+            coveredBy={coveredBy}
             currencies={currencies}
             defaultCurrency={currency}
             defaultDate={addDays(today, 30)}
@@ -60,10 +90,32 @@ export default async function SubscriptionsPage({ searchParams }: { searchParams
         </Card>
       ) : null}
 
+      {overlaps.length ? (
+        <Card className="border-warning/50">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="mt-0.5 size-5 shrink-0 text-warning-ink" aria-hidden />
+            <div className="min-w-0">
+              <p className="font-medium text-ink">Похоже, вы платите дважды</p>
+              <ul className="mt-1 flex flex-col gap-1 text-sm text-ink-2">
+                {overlaps.map(({ included, bundle, monthlyWaste }) => (
+                  <li key={`${included.id}:${bundle.id}`}>
+                    <b className="text-ink">{included.name}</b> уже входит в {bundle.name} — лишние{" "}
+                    {formatMoney(monthlyWaste, included.currency)} в месяц.{" "}
+                    <Link href={`/subscriptions?edit=${included.id}`} className="text-accent-strong hover:underline">
+                      Открыть
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </Card>
+      ) : null}
+
       {sorted.length === 0 ? (
         <EmptyState
           title="Подписок пока нет"
-          description="Добавьте первую подписку: Netlify, Supabase, Claude.ai или любой другой сервис."
+          description="Выберите из каталога 50 популярных сервисов — Okko, Яндекс Плюс, Claude… — или добавьте свой."
           action={
             <Link href="/subscriptions?new=1" className={buttonClass("primary", "sm")}>
               Добавить подписку
@@ -93,6 +145,9 @@ export default async function SubscriptionsPage({ searchParams }: { searchParams
                 return (
                   <tr key={s.id} className={s.status === "paused" ? "opacity-70" : undefined}>
                     <td className="px-5 py-3">
+                      <div className="flex items-center gap-3">
+                      <ServiceAvatar name={s.name} serviceKey={s.serviceKey} size="sm" />
+                      <div className="min-w-0">
                       <div className="flex items-center gap-1.5 font-medium text-ink">
                         {s.name}
                         {s.url ? (
@@ -102,6 +157,8 @@ export default async function SubscriptionsPage({ searchParams }: { searchParams
                         ) : null}
                       </div>
                       <div className="text-xs text-muted">{s.category ?? "Без категории"}</div>
+                      </div>
+                      </div>
                     </td>
                     <td className="tabular px-3 py-3 text-right text-ink">
                       {formatMoney(s.cost, s.currency)}
@@ -115,7 +172,10 @@ export default async function SubscriptionsPage({ searchParams }: { searchParams
                       <div className={soon ? "text-xs font-medium text-warning-ink" : "text-xs text-muted"}>{relativeDays(daysLeft)}</div>
                     </td>
                     <td className="px-3 py-3">
-                      {s.status === "active" ? <Badge tone="good">Активна</Badge> : <Badge>На паузе</Badge>}
+                      <div className="flex flex-wrap gap-1">
+                        {s.status === "active" ? <Badge tone="good">Активна</Badge> : <Badge>На паузе</Badge>}
+                        {s.trialEndsAt && s.trialEndsAt >= today ? <Badge tone="accent">Пробный до {formatDate(s.trialEndsAt)}</Badge> : null}
+                      </div>
                     </td>
                     <td className="px-5 py-3">
                       <div className="flex justify-end gap-1">

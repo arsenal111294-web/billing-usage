@@ -16,6 +16,8 @@ const subscription: Subscription = {
   url: null,
   notes: null,
   integrationId: null,
+  serviceKey: null,
+  trialEndsAt: null,
   createdAt: "",
   updatedAt: "",
 };

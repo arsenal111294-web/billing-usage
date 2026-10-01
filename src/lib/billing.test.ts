@@ -24,6 +24,8 @@ function sub(partial: Partial<Subscription>): Subscription {
     url: null,
     notes: null,
     integrationId: null,
+    serviceKey: null,
+    trialEndsAt: null,
     createdAt: "",
     updatedAt: "",
     ...partial,

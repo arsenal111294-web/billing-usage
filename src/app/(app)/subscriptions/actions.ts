@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireAuth } from "@/lib/auth";
+import { getCatalogService } from "@/lib/catalog";
 import { getRepository } from "@/lib/db";
 import { BILLING_CYCLES, SUBSCRIPTION_STATUSES } from "@/lib/types";
 
@@ -29,6 +30,14 @@ const schema = z.object({
   url: z.preprocess(emptyToNull, z.url({ message: "Некорректная ссылка", protocol: /^https?$/ }).nullable()),
   notes: z.preprocess(emptyToNull, z.string().trim().max(1000).nullable()),
   integrationId: z.preprocess(emptyToNull, z.uuid().nullable()),
+  serviceKey: z.preprocess(
+    emptyToNull,
+    z
+      .string()
+      .refine((key) => getCatalogService(key) !== null, "Неизвестный сервис каталога")
+      .nullable(),
+  ),
+  trialEndsAt: z.preprocess(emptyToNull, z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Укажите дату окончания пробного периода").nullable()),
 });
 
 function refresh() {
@@ -37,16 +46,22 @@ function refresh() {
 
 export async function saveSubscriptionAction(_prev: SubscriptionFormState, formData: FormData): Promise<SubscriptionFormState> {
   await requireAuth();
-  const parsed = schema.safeParse(Object.fromEntries(formData));
+  const raw = Object.fromEntries(formData);
+  // Галочка «пробный период» снята — дату триала не сохраняем.
+  if (raw.trial !== "on") raw.trialEndsAt = "";
+  const parsed = schema.safeParse(raw);
   if (!parsed.success) {
     return { fieldErrors: z.flattenError(parsed.error).fieldErrors };
   }
 
+  // На пробном периоде первое платное списание — в день его окончания.
+  const data = parsed.data.trialEndsAt ? { ...parsed.data, nextBillingDate: parsed.data.trialEndsAt } : parsed.data;
+
   const repo = getRepository();
   const id = String(formData.get("id") ?? "");
   try {
-    if (id) await repo.updateSubscription(id, parsed.data);
-    else await repo.createSubscription(parsed.data);
+    if (id) await repo.updateSubscription(id, data);
+    else await repo.createSubscription(data);
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Не удалось сохранить подписку" };
   }

@@ -24,6 +24,8 @@ interface SubscriptionRow {
   url: string | null;
   notes: string | null;
   integration_id: string | null;
+  service_key: string | null;
+  trial_ends_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -55,6 +57,8 @@ function toSubscription(row: SubscriptionRow): Subscription {
     url: row.url,
     notes: row.notes,
     integrationId: row.integration_id,
+    serviceKey: row.service_key ?? null,
+    trialEndsAt: row.trial_ends_at ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -73,6 +77,8 @@ function fromSubscriptionInput(input: Partial<SubscriptionInput>): Partial<Subsc
   if (input.url !== undefined) row.url = input.url;
   if (input.notes !== undefined) row.notes = input.notes;
   if (input.integrationId !== undefined) row.integration_id = input.integrationId;
+  if (input.serviceKey !== undefined) row.service_key = input.serviceKey;
+  if (input.trialEndsAt !== undefined) row.trial_ends_at = input.trialEndsAt;
   return row;
 }
 

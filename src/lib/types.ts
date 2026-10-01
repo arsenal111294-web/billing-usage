@@ -4,7 +4,19 @@ export type BillingCycle = (typeof BILLING_CYCLES)[number];
 export const SUBSCRIPTION_STATUSES = ["active", "paused"] as const;
 export type SubscriptionStatus = (typeof SUBSCRIPTION_STATUSES)[number];
 
-export const PROVIDER_IDS = ["netlify", "supabase", "anthropic", "openai", "manual"] as const;
+export const PROVIDER_IDS = [
+  "netlify",
+  "supabase",
+  "anthropic",
+  "openai",
+  "timeweb",
+  "selectel",
+  "yandex_cloud",
+  "beget",
+  "deepseek",
+  "openrouter",
+  "manual",
+] as const;
 export type ProviderId = (typeof PROVIDER_IDS)[number];
 
 export type IntegrationStatus = "pending" | "ok" | "error";
@@ -25,13 +37,28 @@ export interface Subscription {
   url: string | null;
   notes: string | null;
   integrationId: string | null;
+  /** Ключ карточки каталога (okko, yandex-plus…) или null для своего сервиса. */
+  serviceKey: string | null;
+  /** Конец пробного периода; первое платное списание — в nextBillingDate. */
+  trialEndsAt: ISODate | null;
   createdAt: string;
   updatedAt: string;
 }
 
 export type SubscriptionInput = Omit<Subscription, "id" | "createdAt" | "updatedAt">;
 
-export type MetricUnit = "usd" | "tokens" | "minutes" | "bytes" | "requests" | "count" | "credits" | "gb";
+export type MetricUnit =
+  | "usd"
+  | "rub"
+  | "cny"
+  | "tokens"
+  | "minutes"
+  | "bytes"
+  | "requests"
+  | "count"
+  | "credits"
+  | "gb"
+  | "days";
 
 export interface UsageMetric {
   key: string;
@@ -44,6 +71,8 @@ export interface UsageMetric {
   note?: string | null;
   /** false — справочная метрика (например, занятые места тарифа): без алертов и уведомлений. */
   alerting?: boolean;
+  /** Для остатков (баланс, дни до блокировки): предупреждать, когда значение опустится до этого порога. */
+  warnBelow?: number;
 }
 
 export interface UsageSnapshot {
