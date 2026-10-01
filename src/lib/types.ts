@@ -31,7 +31,7 @@ export interface Subscription {
 
 export type SubscriptionInput = Omit<Subscription, "id" | "createdAt" | "updatedAt">;
 
-export type MetricUnit = "usd" | "tokens" | "minutes" | "bytes" | "requests" | "count";
+export type MetricUnit = "usd" | "tokens" | "minutes" | "bytes" | "requests" | "count" | "credits";
 
 export interface UsageMetric {
   key: string;
@@ -42,6 +42,8 @@ export interface UsageMetric {
   unit: MetricUnit;
   resetsAt?: string | null;
   note?: string | null;
+  /** false — справочная метрика (например, занятые места тарифа): без алертов и уведомлений. */
+  alerting?: boolean;
 }
 
 export interface UsageSnapshot {

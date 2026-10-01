@@ -28,6 +28,7 @@ export function limitBreaches(integrations: Integration[], threshold = LIMIT_WAR
   const breaches: LimitBreach[] = [];
   for (const integration of integrations) {
     for (const metric of integration.usage?.metrics ?? []) {
+      if (metric.alerting === false) continue;
       const ratio = usageRatio(metric);
       if (ratio !== null && ratio >= threshold) breaches.push({ integration, metric, ratio });
     }

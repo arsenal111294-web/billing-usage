@@ -31,8 +31,44 @@ describe("netlify", () => {
     expect(usage.metrics).toEqual([
       expect.objectContaining({ key: "build_minutes", used: 120, limit: 300 }),
       expect.objectContaining({ key: "bandwidth", used: 1000, limit: 5000 }),
-      expect.objectContaining({ key: "sites", used: 3, limit: 500 }),
     ]);
+  });
+
+  it("counts real sites, estimates credits and keeps seats informational", async () => {
+    const fetch = mockFetch([
+      [
+        /\/accounts$/,
+        [
+          {
+            id: "1",
+            slug: "team",
+            name: "Team",
+            type_name: "Personal",
+            capabilities: { sites: { included: 500, used: 0 }, collaborators: { included: 1, used: 1 } },
+          },
+        ],
+      ],
+      [/\/team\/builds\/status$/, { minutes: { current: 7, included_minutes: null, period_start_date: "2026-10-01T00:00:00.000-07:00" } }],
+      [/\/accounts\/team\/bandwidth$/, { used: 2 * 1024 ** 3, included: 0 }],
+      [/\/team\/sites\?per_page=100$/, [{ id: "s1", name: "a" }, { id: "s2", name: "b" }]],
+      [
+        /\/sites\/s1\/deploys/,
+        [
+          { state: "ready", created_at: "2026-10-05T10:00:00Z" },
+          { state: "error", created_at: "2026-10-05T11:00:00Z" },
+          { state: "ready", created_at: "2026-09-20T10:00:00Z" },
+        ],
+      ],
+      [/\/sites\/s2\/deploys/, [{ state: "ready", created_at: "2026-10-02T10:00:00Z" }]],
+    ]);
+    const usage = await netlifyProvider.fetchUsage({ secrets: { token: "t" }, config: {}, fetch, now });
+    const byKey = Object.fromEntries(usage.metrics.map((m) => [m.key, m]));
+    expect(usage.metrics[0].key).toBe("credits_estimate");
+    // 2 деплоя в периоде × 15 + 2 ГБ × 20
+    expect(byKey.credits_estimate).toMatchObject({ used: 70, limit: 1000, unit: "credits" });
+    expect(byKey.build_minutes).toMatchObject({ used: 7, limit: null });
+    expect(byKey.sites).toMatchObject({ used: 2, limit: 500 });
+    expect(byKey.collaborators).toMatchObject({ used: 1, limit: 1, alerting: false });
   });
 
   it("reports auth errors clearly", async () => {

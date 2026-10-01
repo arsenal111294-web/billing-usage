@@ -70,3 +70,13 @@ describe("renderDigest", () => {
     expect(message.text).toContain("96%");
   });
 });
+
+describe("informational metrics", () => {
+  it("never raise limit alerts", () => {
+    const seats: Integration = {
+      ...integration,
+      usage: { fetchedAt: "", metrics: [{ key: "seats", label: "Места", used: 1, limit: 1, unit: "count", alerting: false }] },
+    };
+    expect(limitBreaches([seats], 0.8)).toHaveLength(0);
+  });
+});

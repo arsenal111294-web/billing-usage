@@ -27,6 +27,8 @@ export function formatMetricValue(value: number, unit: MetricUnit): string {
       return `${compact.format(value)} ток.`;
     case "requests":
       return `${compact.format(value)} запр.`;
+    case "credits":
+      return `${plain.format(value)} кр.`;
     default:
       return compact.format(value);
   }

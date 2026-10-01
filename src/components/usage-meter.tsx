@@ -8,7 +8,16 @@ import { cn } from "./ui";
 /** Индикатор лимита: заливка несёт уровень (норма → предупреждение → критично), трек — светлый шаг той же гаммы. */
 export function UsageMeter({ metric }: { metric: UsageMetric }) {
   const ratio = usageRatio(metric);
-  const level = ratio === null ? "none" : ratio >= LIMIT_CRITICAL ? "critical" : ratio >= LIMIT_WARNING ? "warning" : "ok";
+  const level =
+    ratio === null
+      ? "none"
+      : metric.alerting === false
+        ? "ok"
+        : ratio >= LIMIT_CRITICAL
+          ? "critical"
+          : ratio >= LIMIT_WARNING
+            ? "warning"
+            : "ok";
   const styles = {
     none: { fill: "bg-accent", track: "bg-accent-track" },
     ok: { fill: "bg-accent", track: "bg-accent-track" },
@@ -46,6 +55,7 @@ export function UsageMeter({ metric }: { metric: UsageMetric }) {
               {metric.resetsAt ? ` · сброс ${formatDateTime(metric.resetsAt)}` : null}
             </span>
           </div>
+          {metric.note ? <p className="text-xs text-muted">{metric.note}</p> : null}
         </>
       ) : (
         <p className="text-xs text-muted">{metric.note ?? "Лимит не задан"}</p>
