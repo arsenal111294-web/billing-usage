@@ -52,6 +52,12 @@ export function IntegrationCard({ integration, footer }: { integration: Integrat
         <p className="rounded-lg bg-critical-track/60 px-3 py-2 text-sm text-critical-ink">{integration.lastError}</p>
       ) : null}
 
+      {usage?.notes?.map((note) => (
+        <p key={note} className="rounded-lg bg-surface-2 px-3 py-2 text-xs text-ink-2">
+          {note}
+        </p>
+      ))}
+
       {usage?.metrics.length ? (
         <div className="flex flex-col gap-4">
           {usage.metrics.map((metric) => (

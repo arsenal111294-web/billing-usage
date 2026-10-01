@@ -141,16 +141,61 @@ describe("openai", () => {
 });
 
 describe("supabase", () => {
-  it("applies plan quotas to project stats", async () => {
-    const fetch = mockFetch([
-      [/\/organizations$/, [{ id: "org1", name: "Org" }]],
-      [/\/organizations\/org1$/, { id: "org1", name: "Org", plan: "free" }],
-      [/\/projects$/, [
+  const base: Route[] = [
+    [/\/v1\/organizations$/, [{ id: "org1", name: "Org" }]],
+    [/\/v1\/organizations\/org1$/, { id: "org1", name: "Org", plan: "free" }],
+    [
+      /\/v1\/projects$/,
+      [
         { id: "ref1", name: "app", organization_id: "org1", status: "ACTIVE_HEALTHY" },
         { id: "ref2", name: "old", organization_id: "org1", status: "INACTIVE" },
         { id: "ref3", name: "other", organization_id: "org2", status: "ACTIVE_HEALTHY" },
-      ]],
-      [/\/projects\/ref1\/database\/query$/, [{ db_bytes: "104857600", storage_bytes: 10, mau: "42" }]],
+      ],
+    ],
+  ];
+
+  it("uses the organization usage report when available", async () => {
+    const fetch = mockFetch([
+      ...base,
+      [
+        /\/platform\/organizations\/org1\/usage$/,
+        {
+          usages: [
+            { metric: "EGRESS", usage: 2.562, pricing_free_units: 5, available_in_plan: true },
+            { metric: "DATABASE_SIZE", usage: 0.031, pricing_free_units: 0.5, available_in_plan: true },
+            { metric: "MONTHLY_ACTIVE_SSO_USERS", usage: 0, pricing_free_units: 0, available_in_plan: false },
+            { metric: "REALTIME_MESSAGE_COUNT", usage: 12, pricing_free_units: 2_000_000, available_in_plan: true },
+            { metric: "LOG_QUERYING", usage: 6.804, available_in_plan: true },
+            { metric: "COMPUTE_HOURS_XS", usage: 10 },
+          ],
+        },
+      ],
+    ]);
+    const usage = await supabaseProvider.fetchUsage({ secrets: { token: "t" }, config: {}, fetch, now });
+    const byKey = Object.fromEntries(usage.metrics.map((m) => [m.key, m]));
+    expect(usage.metrics.map((m) => m.key)).toEqual([
+      "egress",
+      "database_size",
+      "monthly_active_sso_users",
+      "realtime_message_count",
+      "log_querying",
+      "active_projects",
+    ]);
+    expect(byKey.egress).toMatchObject({ used: 2.562, limit: 5, unit: "gb" });
+    expect(byKey.monthly_active_sso_users).toMatchObject({ limit: null, note: "Недоступно на текущем тарифе" });
+    expect(byKey.log_querying).toMatchObject({ limit: null, alerting: false });
+    expect(byKey.active_projects).toMatchObject({ used: 1, limit: 2 });
+    expect(usage.notes).toBeUndefined();
+    // В режиме отчёта SQL к проектам не выполняется.
+    const calls = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls.map((c) => String(c[0]));
+    expect(calls.some((u) => u.includes("/database/query"))).toBe(false);
+  });
+
+  it("falls back to read-only SQL stats when the report is unavailable", async () => {
+    const fetch = mockFetch([
+      ...base,
+      [/\/platform\/organizations\/org1\/usage$/, { message: "Unauthorized" }, 401],
+      [/\/v1\/projects\/ref1\/database\/query$/, [{ db_bytes: "104857600", storage_bytes: 10, mau: "42", third_party_mau: "5" }]],
     ]);
     const usage = await supabaseProvider.fetchUsage({ secrets: { token: "t" }, config: {}, fetch, now });
     expect(usage.plan).toBe("Free");
@@ -158,6 +203,8 @@ describe("supabase", () => {
     expect(byKey.active_projects).toMatchObject({ used: 1, limit: 2 });
     expect(byKey["db_size:ref1"]).toMatchObject({ used: 104857600, limit: 500 * 1024 ** 2 });
     expect(byKey.mau).toMatchObject({ used: 42, limit: 50_000 });
+    expect(byKey.third_party_mau).toMatchObject({ used: 5 });
+    expect(usage.notes?.[0]).toContain("недоступен");
   });
 });
 

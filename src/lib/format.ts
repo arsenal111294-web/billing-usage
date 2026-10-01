@@ -27,6 +27,9 @@ export function formatMetricValue(value: number, unit: MetricUnit): string {
       return `${compact.format(value)} ток.`;
     case "requests":
       return `${compact.format(value)} запр.`;
+    case "gb":
+      // Как в дашборде Supabase: значение уже в ГБ.
+      return `${new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 3 }).format(value)} ГБ`;
     case "credits":
       return `${plain.format(value)} кр.`;
     default:

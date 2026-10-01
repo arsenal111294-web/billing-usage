@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, CalendarClock, Plus } from "lucide-react";
 import { AlertRow } from "@/components/alert-row";
+import { AutoRefresh } from "@/components/auto-refresh";
 import { IntegrationCard } from "@/components/integration-card";
 import { SpendingChart } from "@/components/spending-chart";
 import { SyncButton } from "@/components/sync-button";
@@ -10,6 +11,7 @@ import { buildForecastChart } from "@/lib/chart";
 import { convert, formatMoney } from "@/lib/currency";
 import { formatDate, relativeDays } from "@/lib/dates";
 import { loadAppData } from "@/lib/data";
+import { isStale } from "@/lib/integrations/stale";
 
 export default async function DashboardPage() {
   const { today, subscriptions, integrations, alerts, currency, rates } = await loadAppData();
@@ -169,7 +171,8 @@ export default async function DashboardPage() {
             <h2 className="text-lg font-semibold text-ink">Подключённые сервисы</h2>
             <p className="text-sm text-muted">Остатки лимитов и расходы по API</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
+            {integrations.some((i) => isStale(i)) ? <AutoRefresh /> : null}
             {integrations.length ? <SyncButton label="Обновить все" /> : null}
             <Link href="/integrations" className={buttonClass("secondary", "sm")}>
               <Plus className="size-4" aria-hidden /> Подключить

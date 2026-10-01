@@ -31,7 +31,7 @@ export interface Subscription {
 
 export type SubscriptionInput = Omit<Subscription, "id" | "createdAt" | "updatedAt">;
 
-export type MetricUnit = "usd" | "tokens" | "minutes" | "bytes" | "requests" | "count" | "credits";
+export type MetricUnit = "usd" | "tokens" | "minutes" | "bytes" | "requests" | "count" | "credits" | "gb";
 
 export interface UsageMetric {
   key: string;
@@ -52,6 +52,8 @@ export interface UsageSnapshot {
   periodStart?: string | null;
   periodEnd?: string | null;
   metrics: UsageMetric[];
+  /** Пояснения к снимку (например, что часть данных недоступна). */
+  notes?: string[];
 }
 
 export interface Integration {
