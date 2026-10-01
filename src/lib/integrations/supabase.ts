@@ -3,14 +3,15 @@ import { ProviderError, type ProviderDefinition } from "./types";
 import type { MetricUnit, UsageMetric } from "../types";
 
 const API = "https://api.supabase.com";
-const MB = 1024 ** 2;
 const GB = 1024 ** 3;
+/** Supabase считает размер БД в десятичных гигабайтах. */
+const DECIMAL_GB = 1e9;
 
 /** Квоты тарифов Supabase (https://supabase.com/pricing) — для запасного режима без отчёта об использовании. */
-const PLAN_QUOTAS: Record<string, { dbBytes: number; storageBytes: number; mau: number; activeProjects: number | null }> = {
-  free: { dbBytes: 500 * MB, storageBytes: 1 * GB, mau: 50_000, activeProjects: 2 },
-  pro: { dbBytes: 8 * GB, storageBytes: 100 * GB, mau: 100_000, activeProjects: null },
-  team: { dbBytes: 8 * GB, storageBytes: 100 * GB, mau: 100_000, activeProjects: null },
+const PLAN_QUOTAS: Record<string, { dbGb: number; storageBytes: number; mau: number; activeProjects: number | null }> = {
+  free: { dbGb: 0.5, storageBytes: 1 * GB, mau: 50_000, activeProjects: 2 },
+  pro: { dbGb: 8, storageBytes: 100 * GB, mau: 100_000, activeProjects: null },
+  team: { dbGb: 8, storageBytes: 100 * GB, mau: 100_000, activeProjects: null },
 };
 
 interface SupabaseOrganization {
@@ -63,9 +64,10 @@ const USAGE_METRICS: Record<string, { label: string; unit: MetricUnit; alerting?
 };
 
 // Только чтение: размер БД, объём файлов и активные пользователи с начала месяца.
+// Размер БД — сумма всех баз на сервере проекта (включая template0/1): так считает дашборд Supabase.
 const STATS_QUERY = `
 select
-  pg_database_size(current_database()) as db_bytes,
+  (select sum(pg_database_size(oid)) from pg_database) as db_bytes,
   (select coalesce(sum((metadata->>'size')::bigint), 0) from storage.objects) as storage_bytes,
   (select count(*) from auth.users where last_sign_in_at >= date_trunc('month', now())) as mau,
   (select count(distinct i.user_id) from auth.identities i join auth.users u on u.id = i.user_id
@@ -104,6 +106,7 @@ export const supabaseProvider: ProviderDefinition = {
     const orgRef = config.organization ? orgs.find((o) => o.id === config.organization) : orgs[0];
     if (!orgRef) throw new ProviderError("Supabase: организация не найдена");
     const slug = encodeURIComponent(orgRef.id);
+    let reportError = "";
 
     const [org, projects, usage] = await Promise.all([
       requestJson<SupabaseOrganization>(fetch, "Supabase", `${API}/v1/organizations/${slug}`, { headers }).catch(() => orgRef),
@@ -114,7 +117,10 @@ export const supabaseProvider: ProviderDefinition = {
         "Supabase",
         `${API}/platform/organizations/${slug}/usage${config.projectRef ? `?project_ref=${encodeURIComponent(config.projectRef)}` : ""}`,
         { headers },
-      ).catch(() => null),
+      ).catch((error: unknown) => {
+        reportError = error instanceof ProviderError && error.status ? `HTTP ${error.status}` : "нет ответа";
+        return null;
+      }),
     ]);
 
     const plan = (org.plan ?? "free").toLowerCase();
@@ -133,6 +139,8 @@ export const supabaseProvider: ProviderDefinition = {
       used: active.length,
       limit: quota?.activeProjects ?? null,
       unit: "count",
+      // Занятые слоты тарифа, а не расходуемый ресурс — без тревог и уведомлений.
+      alerting: false,
     };
 
     const reportMetrics = usage?.usages ? fromUsageReport(usage) : [];
@@ -144,7 +152,7 @@ export const supabaseProvider: ProviderDefinition = {
       plan: planLabel,
       metrics: [projectsMetric, ...(await sqlFallback(fetch, headers, orgProjects, active, config.projectRef, quota))],
       notes: [
-        "Отчёт об использовании Supabase недоступен для этого токена: Egress, Realtime и Edge Functions не показаны, остальное посчитано по проектам.",
+        `Supabase не отдаёт отчёт об использовании по токену (${reportError || "пустой ответ"}): Egress, Realtime и Edge Functions доступны только в дашборде. Остальное посчитано по проектам.`,
       ],
     };
   },
@@ -203,7 +211,7 @@ async function sqlFallback(
         label: `БД «${project.name}»`,
         used: 0,
         limit: null,
-        unit: "bytes",
+        unit: "gb",
         note: "Не удалось выполнить запрос статистики",
       });
       return;
@@ -216,9 +224,9 @@ async function sqlFallback(
     metrics.push({
       key: `db_size:${project.id}`,
       label: `БД «${project.name}»`,
-      used: toNumber(row.db_bytes),
-      limit: quota?.dbBytes ?? null,
-      unit: "bytes",
+      used: Math.round((toNumber(row.db_bytes) / DECIMAL_GB) * 1000) / 1000,
+      limit: quota?.dbGb ?? null,
+      unit: "gb",
     });
   });
 

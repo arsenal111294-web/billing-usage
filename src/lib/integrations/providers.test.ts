@@ -195,16 +195,18 @@ describe("supabase", () => {
     const fetch = mockFetch([
       ...base,
       [/\/platform\/organizations\/org1\/usage$/, { message: "Unauthorized" }, 401],
-      [/\/v1\/projects\/ref1\/database\/query$/, [{ db_bytes: "104857600", storage_bytes: 10, mau: "42", third_party_mau: "5" }]],
+      [/\/v1\/projects\/ref1\/database\/query$/, [{ db_bytes: "30773425", storage_bytes: 10, mau: "42", third_party_mau: "5" }]],
     ]);
     const usage = await supabaseProvider.fetchUsage({ secrets: { token: "t" }, config: {}, fetch, now });
     expect(usage.plan).toBe("Free");
     const byKey = Object.fromEntries(usage.metrics.map((m) => [m.key, m]));
     expect(byKey.active_projects).toMatchObject({ used: 1, limit: 2 });
-    expect(byKey["db_size:ref1"]).toMatchObject({ used: 104857600, limit: 500 * 1024 ** 2 });
+    // 30 773 425 байт = 0,031 ГБ — ровно как на странице Usage в дашборде Supabase.
+    expect(byKey["db_size:ref1"]).toMatchObject({ used: 0.031, limit: 0.5, unit: "gb" });
     expect(byKey.mau).toMatchObject({ used: 42, limit: 50_000 });
     expect(byKey.third_party_mau).toMatchObject({ used: 5 });
-    expect(usage.notes?.[0]).toContain("недоступен");
+    expect(usage.notes?.[0]).toContain("HTTP 401");
+    expect(byKey.active_projects.alerting).toBe(false);
   });
 });
 
